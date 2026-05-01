@@ -93,7 +93,7 @@ class GPT(nn.Module):
         ))
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
-    def forward(self, idx):
+    def forward(self, idx, targets=None):
         device = idx.device
         b, t = idx.size()
         assert t <= self.transformer.wpe.weight.size(0), "Cannot forward, model block size is exhausted."
@@ -106,6 +106,9 @@ class GPT(nn.Module):
         x = self.transformer.ln_f(x) # final layer norm AFTER all blocks
         logits = self.lm_head(x) # (b, t, vocab_size)
 
+        if targets is not None:
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+            return logits, loss
         return logits
     
     @classmethod
@@ -186,3 +189,24 @@ for i in range(num_return_sequences):
     generated_tokens = x[i].tolist()
     generated_text = tokenizer.decode(generated_tokens)
     print(f"Generated text {i+1}: {generated_text}")
+
+#load the file input.txt and generate text based on the content of the file
+import tiktoken
+tokenizer = tiktoken.get_encoding("gpt2")
+enc = tiktoken.get_encoding("gpt2")
+with open('input.txt', 'r') as f:
+    file_content = f.read() 
+
+tokens = enc.encode(file_content[:1024]) # encode the file content into tokens
+B,T = 4,32
+buf = torch.tensor(tokens[:B*T +1])
+x = buf[:B*T].view(B,T)
+y = buf[1:B*T +1].view(B,T)
+x = x.to(device)
+y = y.to(device)
+
+model = GPT(GPTConfig(vocab_size=50257, block_size=1024, n_layer=12, n_head=12, n_embd=768))
+model = model.to(device)
+logits , loss = model(x,y)
+
+print(loss.item())
