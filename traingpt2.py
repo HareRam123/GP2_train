@@ -101,9 +101,9 @@ class GPT(nn.Module):
         tok_emb = self.transformer.wte(idx) # token embeddings of shape (b, t, n_embd)
         pos_emb = self.transformer.wpe(pos) # position embeddings of shape (1, t, n_embd)
         x = tok_emb + pos_emb # (b, t, n_embd)
-        x = self.transformer.ln_f(x)
         for block in self.transformer.h:
             x = block(x)
+        x = self.transformer.ln_f(x) # final layer norm AFTER all blocks
         logits = self.lm_head(x) # (b, t, vocab_size)
 
         return logits
@@ -156,6 +156,33 @@ class GPT(nn.Module):
                     sd[k].copy_(sd_hf[k])
 
         return model
-    
+
 model = GPT.from_pretrained('gpt2') 
-print("number of parameters in model: %e" % sum(p.numel() for p in model.parameters())) 
+print("Loaded the model with %e parameters" % sum(p.numel() for p in model.parameters())) 
+num_return_sequences = 5
+max_length = 30
+device = 'mps' if torch.backends.mps.is_available() else ('cuda' if torch.cuda.is_available() else 'cpu')
+model.eval()
+model = model.to(device)
+
+import tiktoken
+tokenizer = tiktoken.get_encoding("gpt2")
+prompt = "The meaning of life is"
+tokens = tokenizer.encode(prompt)
+x = torch.tensor(tokens, dtype=torch.long, device=device).unsqueeze(0).repeat(num_return_sequences, 1)
+x = x.to(device)
+
+torch.manual_seed(1337)
+with torch.no_grad():
+    for _ in range(max_length):
+        logits = model(x)
+        logits = logits[:, -1, :] # we only care about the last time step
+        probs = F.softmax(logits, dim=-1) # (B, vocab_size)
+        next_token = torch.multinomial(probs, num_samples=1) # (B, 1)
+        x = torch.cat((x, next_token), dim=1) # append to the sequence and continue
+
+#print the generated sequences
+for i in range(num_return_sequences):       
+    generated_tokens = x[i].tolist()
+    generated_text = tokenizer.decode(generated_tokens)
+    print(f"Generated text {i+1}: {generated_text}")
