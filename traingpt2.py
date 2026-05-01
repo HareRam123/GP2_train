@@ -160,35 +160,36 @@ class GPT(nn.Module):
 
         return model
 
-model = GPT.from_pretrained('gpt2') 
-print("Loaded the model with %e parameters" % sum(p.numel() for p in model.parameters())) 
-num_return_sequences = 5
-max_length = 30
+# model = GPT.from_pretrained('gpt2') 
+# print("Loaded the model with %e parameters" % sum(p.numel() for p in model.parameters())) 
+# num_return_sequences = 5
+# max_length = 30
 device = 'mps' if torch.backends.mps.is_available() else ('cuda' if torch.cuda.is_available() else 'cpu')
-model.eval()
-model = model.to(device)
+#device = 'cpu'
+# model.eval()
+# model = model.to(device)
 
-import tiktoken
-tokenizer = tiktoken.get_encoding("gpt2")
-prompt = "The meaning of life is"
-tokens = tokenizer.encode(prompt)
-x = torch.tensor(tokens, dtype=torch.long, device=device).unsqueeze(0).repeat(num_return_sequences, 1)
-x = x.to(device)
+# import tiktoken
+# tokenizer = tiktoken.get_encoding("gpt2")
+# prompt = "The meaning of life is"
+# tokens = tokenizer.encode(prompt)
+# x = torch.tensor(tokens, dtype=torch.long, device=device).unsqueeze(0).repeat(num_return_sequences, 1)
+# x = x.to(device)
 
-torch.manual_seed(1337)
-with torch.no_grad():
-    for _ in range(max_length):
-        logits = model(x)
-        logits = logits[:, -1, :] # we only care about the last time step
-        probs = F.softmax(logits, dim=-1) # (B, vocab_size)
-        next_token = torch.multinomial(probs, num_samples=1) # (B, 1)
-        x = torch.cat((x, next_token), dim=1) # append to the sequence and continue
+# torch.manual_seed(1337)
+# with torch.no_grad():
+#     for _ in range(max_length):
+#         logits = model(x)
+#         logits = logits[:, -1, :] # we only care about the last time step
+#         probs = F.softmax(logits, dim=-1) # (B, vocab_size)
+#         next_token = torch.multinomial(probs, num_samples=1) # (B, 1)
+#         x = torch.cat((x, next_token), dim=1) # append to the sequence and continue
 
 #print the generated sequences
-for i in range(num_return_sequences):       
-    generated_tokens = x[i].tolist()
-    generated_text = tokenizer.decode(generated_tokens)
-    print(f"Generated text {i+1}: {generated_text}")
+# for i in range(num_return_sequences):       
+#     generated_tokens = x[i].tolist()
+#     generated_text = tokenizer.decode(generated_tokens)
+#     print(f"Generated text {i+1}: {generated_text}")
 
 #load the file input.txt and generate text based on the content of the file
 import tiktoken
@@ -200,6 +201,7 @@ with open('input.txt', 'r') as f:
 tokens = enc.encode(file_content[:1024]) # encode the file content into tokens
 B,T = 4,32
 buf = torch.tensor(tokens[:B*T +1])
+buf = buf.to(device)
 x = buf[:B*T].view(B,T)
 y = buf[1:B*T +1].view(B,T)
 x = x.to(device)
@@ -209,4 +211,12 @@ model = GPT(GPTConfig(vocab_size=50257, block_size=1024, n_layer=12, n_head=12, 
 model = model.to(device)
 logits , loss = model(x,y)
 
-print(loss.item())
+print(f"Device: {device}")
+
+optimiser = torch.optim.AdamW(model.parameters(), lr=3e-4)
+for epoch in range(100):
+    optimiser.zero_grad()
+    logits , loss = model(x,y)
+    print(f"Epoch {epoch+1}, Loss: {loss.item()}")
+    loss.backward()
+    optimiser.step()
