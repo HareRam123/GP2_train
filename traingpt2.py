@@ -159,6 +159,33 @@ class GPT(nn.Module):
                     sd[k].copy_(sd_hf[k])
 
         return model
+    
+
+class DataLoaderLite:
+    def __init__(self, B,T):
+        self.B = B
+        self.T = T
+        with open('input.txt', 'r') as f:
+            file_content = f.read()
+        enc = tiktoken.get_encoding("gpt2")
+        tokens = enc.encode(file_content) # encode the file content into tokens
+        self.tokens = torch.tensor(tokens, dtype=torch.long)
+        print(f"DataLoaderLite initialized with {len(self.tokens)} tokens")
+        print(f"DataLoaderLite will produce batches of size {B} and sequence length {T}")
+        print(f"Total number of batches per epoch: {len(self.tokens) // (B*T)}")
+        self.current_idx = 0
+
+    def next_batch(self):
+        B,T = self.B, self.T
+        buf = self.tokens[self.current_idx:self.current_idx + B*T +1]
+        x = buf[:B*T].view(B,T)
+        y = buf[1:B*T +1].view(B,T)
+        self.current_idx += B*T    
+
+        if self.current_idx + B*T +1 >= len(self.tokens):
+            self.current_idx = 0 # reset for next epoch
+        return x, y
+
 
 # model = GPT.from_pretrained('gpt2') 
 # print("Loaded the model with %e parameters" % sum(p.numel() for p in model.parameters())) 
@@ -213,9 +240,14 @@ logits , loss = model(x,y)
 
 print(f"Device: {device}")
 
+data_loader = DataLoaderLite(B, T)
+
 optimiser = torch.optim.AdamW(model.parameters(), lr=3e-4)
 for epoch in range(100):
     optimiser.zero_grad()
+    x, y = data_loader.next_batch()
+    x = x.to(device)
+    y = y.to(device)
     logits , loss = model(x,y)
     print(f"Epoch {epoch+1}, Loss: {loss.item()}")
     loss.backward()
