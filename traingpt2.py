@@ -92,7 +92,9 @@ class GPT(nn.Module):
             ln_f = nn.LayerNorm(config.n_embd), # final layer norm - GPT2 uses additional layer norm at the end of the model (before the head
         ))
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
-
+        #weight sharing between the token embedding and the output projection layers
+        self.transformer.wte.weight = self.lm_head.weight
+        
     def forward(self, idx, targets=None):
         device = idx.device
         b, t = idx.size()
