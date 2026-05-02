@@ -278,7 +278,7 @@ torch.set_float32_matmul_precision('high')
 
 
 
-optimiser = torch.optim.AdamW(model.parameters(), lr=3e-4)
+optimiser = torch.optim.AdamW(model.parameters(), lr=3e-4,betas=(0.9, 0.95), eps=1e-8)
 for epoch in range(100):
     t0 = time.time()
     optimiser.zero_grad()
@@ -287,7 +287,9 @@ for epoch in range(100):
     y = y.to(device)
     with torch.autocast(device_type=device, dtype=torch.bfloat16):
         logits , loss = model(x,y)
-        loss.backward()
+
+    loss.backward()
+    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
     optimiser.step()
     #torch.cuda.synchronize()
     t1 = time.time()
