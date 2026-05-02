@@ -258,6 +258,7 @@ y = y.to(device)
 
 model = GPT(GPTConfig(vocab_size=50257, block_size=1024, n_layer=12, n_head=12, n_embd=768))
 model = model.to(device)
+torch.compile(model)
 logits , loss = model(x,y)
 
 print(f"Device: {device}")
