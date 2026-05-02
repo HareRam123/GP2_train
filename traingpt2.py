@@ -6,7 +6,8 @@ from torch.nn import functional as F
 
 @dataclass
 class GPTConfig:
-    vocab_size: int = 50257 # number of tokens :50,000 BPE Merges + 256 Byte Tokens + 1 <endoftext> token
+    #vocab_size: int = 50257 # number of tokens :50,000 BPE Merges + 256 Byte Tokens + 1 <endoftext> token
+    vocab_size: int = 50304 # make this divisible by 64 for efficiency reasons (GPT-2 vocab size is 50257, so we round it up to the nearest multiple of 64)
     block_size: int = 1024 # maximum context length for predictions (e.g., how many tokens the model can look at when making a prediction)
     n_layer: int = 12 # number of transformer blocks (layers) in the model
     n_head: int = 12 # number of attention heads in each transformer block (multi-head attention allows the model to focus on different parts of the input simultaneously)
