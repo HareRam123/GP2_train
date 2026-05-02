@@ -245,6 +245,8 @@ enc = tiktoken.get_encoding("gpt2")
 with open('input.txt', 'r') as f:
     file_content = f.read() 
 
+
+import time
 tokens = enc.encode(file_content[:1024]) # encode the file content into tokens
 B,T = 4,32
 buf = torch.tensor(tokens[:B*T +1])
@@ -260,15 +262,28 @@ logits , loss = model(x,y)
 
 print(f"Device: {device}")
 
+
+
+import time
+B ,T = 8 ,1024
 data_loader = DataLoaderLite(B, T)
+torch.set_float32_matmul_precision('high')
+
+
 
 optimiser = torch.optim.AdamW(model.parameters(), lr=3e-4)
 for epoch in range(100):
+    t0 = time.time()
     optimiser.zero_grad()
     x, y = data_loader.next_batch()
     x = x.to(device)
     y = y.to(device)
-    logits , loss = model(x,y)
-    print(f"Epoch {epoch+1}, Loss: {loss.item()}")
-    loss.backward()
+    with torch.autocast(device_type=device, dtype=torch.bfloat16):
+        logits , loss = model(x,y)
+        loss.backward()
     optimiser.step()
+    #torch.cuda.synchronize()
+    t1 = time.time()
+    dt = (t1 - t0)*1000
+    tokens_per_sec = (B*T) / (t1 - t0)
+    print(f"Epoch {epoch+1}, Loss: {loss.item()}, Time: {dt:.2f}, Tokens/sec: {tokens_per_sec:.2f}")
