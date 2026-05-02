@@ -289,10 +289,10 @@ for epoch in range(100):
         logits , loss = model(x,y)
 
     loss.backward()
-    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+    norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
     optimiser.step()
     #torch.cuda.synchronize()
     t1 = time.time()
     dt = (t1 - t0)*1000
     tokens_per_sec = (B*T) / (t1 - t0)
-    print(f"Epoch {epoch+1}, Loss: {loss.item()}, Time: {dt:.2f}, Tokens/sec: {tokens_per_sec:.2f}")
+    print(f"Epoch {epoch+1}, NormLoss: {loss.item()}, GradNorm: {norm:.2f}, Time(ms): {dt:.2f}, Tokens/sec: {tokens_per_sec:.2f}")
